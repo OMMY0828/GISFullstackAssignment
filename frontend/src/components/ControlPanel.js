@@ -70,7 +70,6 @@ const ControlPanel = ({ onShowPanel, mapRef }) => {
 
   return (
     <div className="d-flex justify-content-between align-items-center p-2 bg-light">
-      {/* Basemap Buttons */}
       <div className="d-flex align-items-center">
         <strong className="me-2">Basemap:</strong>
         <Button
@@ -99,7 +98,6 @@ const ControlPanel = ({ onShowPanel, mapRef }) => {
         </Button>
       </div>
 
-      {/* WMS Layers */}
       <div className="d-flex flex-column align-items-center">
         <h6 className="mb-2">WMS Layers</h6>
         <Row className="g-3">
@@ -152,7 +150,6 @@ const ControlPanel = ({ onShowPanel, mapRef }) => {
         </Row>
       </div>
 
-      {/* Action Buttons */}
       <div className="d-flex align-items-center">
         <Button
           size="sm"
@@ -160,6 +157,7 @@ const ControlPanel = ({ onShowPanel, mapRef }) => {
           className="mx-1"
           active={activeAction === 'allshow'}
           onClick={() => handleActionClick('allshow')}
+          type="button"
         >
           All Locations
         </Button>
@@ -169,6 +167,7 @@ const ControlPanel = ({ onShowPanel, mapRef }) => {
           className="mx-1"
           active={activeAction === 'add'}
           onClick={() => handleActionClick('add')}
+          type="button"
         >
           Add Place
         </Button>
@@ -178,6 +177,7 @@ const ControlPanel = ({ onShowPanel, mapRef }) => {
           className="mx-1"
           active={activeAction === 'nearest'}
           onClick={() => handleActionClick('nearest')}
+          type="button"
         >
           Nearest
         </Button>
@@ -187,6 +187,7 @@ const ControlPanel = ({ onShowPanel, mapRef }) => {
           className="mx-1"
           active={activeAction === 'nearby'}
           onClick={() => handleActionClick('nearby')}
+          type="button"
         >
           Nearby
         </Button>
@@ -196,6 +197,7 @@ const ControlPanel = ({ onShowPanel, mapRef }) => {
           className="mx-1"
           active={activeAction === 'distance'}
           onClick={() => handleActionClick('distance')}
+          type="button"
         >
           Distance
         </Button>
@@ -204,6 +206,7 @@ const ControlPanel = ({ onShowPanel, mapRef }) => {
           variant="outline-secondary"
           className="mx-1"
           onClick={() => handleActionClick('reset')}
+          type="button"
         >
           Reset View
         </Button>

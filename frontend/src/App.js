@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react'; // CHANGED: Added useCallback
 import { Container, Navbar, Button, Form, Row, Col, Card } from 'react-bootstrap';
 import MapComponent from './components/MapComponent';
 import ControlPanel from './components/ControlPanel';
@@ -19,14 +19,15 @@ function App() {
     setDistanceResult("");
   };
 
-  const handleShowPanel = (panelType) => {
-    setActivePanel(panelType);
+  const handleShowPanel = useCallback((panelType) => {
+    if (activePanel !== panelType) {
+      setActivePanel(panelType);
+    }
     setMapClickActive(false);
-  };
+  }, [activePanel]); 
 
   const handleMapClick = (coords) => {
     if (mapClickActive && activePanel) {
-      // Auto-fill coordinates in the form based on active panel
       if (activePanel === 'add' || activePanel === 'nearest' || activePanel === 'nearby') {
         const latInput = document.getElementById(`${activePanel}Lat`);
         const lngInput = document.getElementById(`${activePanel}Lng`);
@@ -36,7 +37,6 @@ function App() {
         }
         mapRef.current?.addTemporaryMarker([coords[0], coords[1]], 'selection');
       } else if (activePanel === 'distance') {
-        // For distance, fill the first empty field
         const lat1Input = document.getElementById('distanceLat1');
         const lng1Input = document.getElementById('distanceLng1');
         const lat2Input = document.getElementById('distanceLat2');
@@ -45,21 +45,18 @@ function App() {
         if (!lat1Input.value || !lng1Input.value) {
           lat1Input.value = coords[1];
           lng1Input.value = coords[0];
-          // Show blue marker for point 1
           mapRef.current?.addTemporaryMarker([coords[0], coords[1]], 'point1');
         } else if (!lat2Input.value || !lng2Input.value) {
           lat2Input.value = coords[1];
           lng2Input.value = coords[0];
-          // Show green marker for point 2
           mapRef.current?.addTemporaryMarker([coords[0], coords[1]], 'point2');
         } else {
-          // If both points are filled, replace the second one
           lat2Input.value = coords[1];
           lng2Input.value = coords[0];
-          // Update markers
-          mapRef.current?.clearMap();
-          mapRef.current?.addTemporaryMarker([parseFloat(lng1Input.value), parseFloat(lat1Input.value)], 'point1');
-          mapRef.current?.addTemporaryMarker([coords[0], coords[1]], 'point2');
+          mapRef.current?.plotDistancePoints(
+            [parseFloat(lng1Input.value), parseFloat(lat1Input.value)],
+            [coords[0], coords[1]]
+          );
         }
       }
     }
@@ -139,14 +136,16 @@ function App() {
       const distanceKm = (data.distance_meters / 1000).toFixed(2);
       setDistanceResult(`Distance between points: ${distanceKm} km`);
       
-      // Plot the points and line on map
       mapRef.current?.plotDistancePoints([lng1, lat1], [lng2, lat2]);
     } catch (error) {
       setDistanceResult('Error calculating distance');
     }
   };
 
-  const toggleMapClick = () => {
+  const toggleMapClick = (e) => {
+    if (e) {
+      e.preventDefault();
+    }
     setMapClickActive(!mapClickActive);
   };
 
@@ -171,7 +170,6 @@ function App() {
         mapClickActive={mapClickActive}
       />
 
-      {/* Floating Action Panel */}
       {activePanel && (
         <div className="floating-panel">
           <Card>
@@ -232,7 +230,6 @@ function App() {
   );
 }
 
-// Form Components (same as before)
 const AddPlaceForm = ({ mapClickActive, onToggleMapClick }) => (
   <Form>
     <Form.Group className="mb-2">
@@ -260,8 +257,12 @@ const AddPlaceForm = ({ mapClickActive, onToggleMapClick }) => (
     <Button 
       variant={mapClickActive ? "success" : "outline-secondary"}
       size="sm" 
-      onClick={onToggleMapClick}
+      onClick={(e) => {
+        e.preventDefault();
+        onToggleMapClick();
+      }}
       className="w-100"
+      type="button" 
     >
       {mapClickActive ? '✓ Click on Map to Select' : 'Pick from Map'}
     </Button>
@@ -292,8 +293,12 @@ const NearestForm = ({ mapClickActive, onToggleMapClick }) => (
     <Button 
       variant={mapClickActive ? "success" : "outline-secondary"}
       size="sm" 
-      onClick={onToggleMapClick}
+      onClick={(e) => {
+        e.preventDefault();
+        onToggleMapClick();
+      }}
       className="w-100"
+      type="button" 
     >
       {mapClickActive ? '✓ Click on Map to Select' : 'Pick from Map'}
     </Button>
@@ -333,8 +338,12 @@ const NearbyForm = ({ mapClickActive, onToggleMapClick }) => (
     <Button 
       variant={mapClickActive ? "success" : "outline-secondary"}
       size="sm" 
-      onClick={onToggleMapClick}
+      onClick={(e) => {
+        e.preventDefault();
+        onToggleMapClick();
+      }}
       className="w-100"
+      type="button" 
     >
       {mapClickActive ? '✓ Click on Map to Select' : 'Pick from Map'}
     </Button>
@@ -375,8 +384,12 @@ const DistanceForm = ({ mapClickActive, onToggleMapClick, distanceResult }) => (
     <Button 
       variant={mapClickActive ? "success" : "outline-secondary"}
       size="sm" 
-      onClick={onToggleMapClick}
+      onClick={(e) => {
+        e.preventDefault();
+        onToggleMapClick();
+      }}
       className="w-100 mb-2"
+      type="button" 
     >
       {mapClickActive ? '✓ Click on Map to Select Points' : 'Pick from Map'}
     </Button>

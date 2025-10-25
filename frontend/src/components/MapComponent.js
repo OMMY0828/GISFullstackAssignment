@@ -22,7 +22,59 @@ const MapComponent = forwardRef(({ onMapClick, mapClickActive }, ref) => {
   const distanceLineRef = useRef(null);
   const [isMapReady, setIsMapReady] = useState(false);
 
-  // Update cursor based on map click activity
+  
+  const initializeLayers = () => {
+    if (Object.keys(layers.current).length === 0) {
+      layers.current.osm = new TileLayer({
+        source: new OSM(),
+        visible: true
+      });
+
+      layers.current.carto = new TileLayer({
+        source: new XYZ({
+          url: 'https://{a-c}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'
+        }),
+        visible: false
+      });
+
+      layers.current.esri = new TileLayer({
+        source: new XYZ({
+          url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+        }),
+        visible: false
+      });
+
+      layers.current.cities = new TileLayer({
+        source: new TileWMS({
+          url: 'https://ows.mundialis.de/services/service?',
+          params: {
+            LAYERS: 'OSM-WMS',
+            FORMAT: 'image/png',
+            TRANSPARENT: true,
+            TILED: true
+          },
+          serverType: 'geoserver'
+        }),
+        visible: true,
+        opacity: 0
+      });
+
+      layers.current.states = new TileLayer({
+        source: new TileWMS({
+          url: 'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi',
+          params: {
+            LAYERS: 'Reference_Features',
+            FORMAT: 'image/png',
+            TRANSPARENT: true
+          }
+        }),
+        visible: true,
+        opacity: 0
+      });
+    }
+  };
+
+  
   useEffect(() => {
     if (mapInstance.current && isMapReady) {
       const viewport = mapInstance.current.getViewport();
@@ -34,7 +86,7 @@ const MapComponent = forwardRef(({ onMapClick, mapClickActive }, ref) => {
     }
   }, [mapClickActive, isMapReady]);
 
-  // Safe zoom function that checks if map is ready
+  
   const safeZoomToExtent = (extent, options = {}) => {
     if (mapInstance.current && isMapReady) {
       mapInstance.current.getView().fit(extent, {
@@ -56,7 +108,7 @@ const MapComponent = forwardRef(({ onMapClick, mapClickActive }, ref) => {
     }
   };
 
-  // Function to add temporary marker when selecting points from map
+  
   const addTemporaryMarker = (coords, markerType = 'selection') => {
     if (!mapInstance.current || !isMapReady) return;
     
@@ -105,7 +157,6 @@ const MapComponent = forwardRef(({ onMapClick, mapClickActive }, ref) => {
     vectorSource.current.addFeature(marker);
   };
 
-
   useImperativeHandle(ref, () => ({
     showAllLocations: async () => {
       vectorSource.current.clear();
@@ -136,7 +187,7 @@ const MapComponent = forwardRef(({ onMapClick, mapClickActive }, ref) => {
 
         vectorSource.current.addFeatures(features);
         
-        // Zoom to show all locations
+        
         if (features.length > 0) {
           setTimeout(() => {
             safeZoomToExtent(vectorSource.current.getExtent(), { maxZoom: 6 });
@@ -169,7 +220,7 @@ const MapComponent = forwardRef(({ onMapClick, mapClickActive }, ref) => {
         }));
         vectorSource.current.addFeature(feature);
 
-        // Zoom to the newly added place
+        
         setTimeout(() => {
           safeAnimateTo(fromLonLat([lng, lat]), 14);
         }, 100);
@@ -206,7 +257,7 @@ const MapComponent = forwardRef(({ onMapClick, mapClickActive }, ref) => {
           }));
           vectorSource.current.addFeature(feature);
 
-          // Zoom to the nearest place
+          
           setTimeout(() => {
             safeAnimateTo(fromLonLat([lon, plat]), 14);
           }, 100);
@@ -247,13 +298,12 @@ const MapComponent = forwardRef(({ onMapClick, mapClickActive }, ref) => {
 
           vectorSource.current.addFeatures(features);
 
-          // Zoom to show all nearby places
+          
           setTimeout(() => {
             safeZoomToExtent(vectorSource.current.getExtent(), { maxZoom: 12 });
           }, 100);
         } else {
           alert('No nearby places found');
-          // Zoom to the search center point
           setTimeout(() => {
             safeAnimateTo(fromLonLat([lng, lat]), 12);
           }, 100);
@@ -264,10 +314,8 @@ const MapComponent = forwardRef(({ onMapClick, mapClickActive }, ref) => {
     },
 
     plotDistancePoints: (point1, point2) => {
-      // Clear previous distance markers and line
       vectorSource.current.clear();
       
-      // Add first point marker
       const marker1 = new Feature({
         geometry: new Point(fromLonLat(point1))
       });
@@ -284,7 +332,6 @@ const MapComponent = forwardRef(({ onMapClick, mapClickActive }, ref) => {
       }));
       vectorSource.current.addFeature(marker1);
 
-      // Add second point marker
       const marker2 = new Feature({
         geometry: new Point(fromLonLat(point2))
       });
@@ -301,7 +348,6 @@ const MapComponent = forwardRef(({ onMapClick, mapClickActive }, ref) => {
       }));
       vectorSource.current.addFeature(marker2);
 
-      // Create line between points
       const line = new Feature({
         geometry: new LineString([fromLonLat(point1), fromLonLat(point2)])
       });
@@ -314,21 +360,25 @@ const MapComponent = forwardRef(({ onMapClick, mapClickActive }, ref) => {
       vectorSource.current.addFeature(line);
       distanceLineRef.current = line;
 
-      // Fit view to show both points with some padding
       setTimeout(() => {
         safeZoomToExtent(vectorSource.current.getExtent(), { maxZoom: 10 });
       }, 100);
     },
 
-    // Add temporary marker when selecting coordinates from map
     addTemporaryMarker: (coords, markerType = 'selection') => {
       addTemporaryMarker(coords, markerType);
+    },
+
+    clearMap: () => {
+      if (vectorSource.current) {
+        vectorSource.current.clear();
+      }
+      distanceLineRef.current = null;
     },
 
     setBasemap: (basemap) => {
       const { osm, carto, esri } = layers.current;
       if (mapInstance.current && isMapReady) {
-        // Set visibility based on selected basemap
         osm.setVisible(basemap === 'osm');
         carto.setVisible(basemap === 'carto');
         esri.setVisible(basemap === 'esri');
@@ -343,7 +393,6 @@ const MapComponent = forwardRef(({ onMapClick, mapClickActive }, ref) => {
       }
     },
 
-    // New method to reset view to default
     resetView: () => {
       if (mapInstance.current && isMapReady) {
         mapInstance.current.getView().animate({
@@ -354,65 +403,16 @@ const MapComponent = forwardRef(({ onMapClick, mapClickActive }, ref) => {
       }
     },
 
-    // Method to check if map is ready
     isMapReady: () => isMapReady
   }));
 
   useEffect(() => {
-    // Initialize layers
-    layers.current.osm = new TileLayer({
-      source: new OSM(),
-      visible: true
-    });
+    initializeLayers();
 
-    layers.current.carto = new TileLayer({
-      source: new XYZ({
-        url: 'https://{a-c}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'
-      }),
-      visible: false
-    });
-
-    layers.current.esri = new TileLayer({
-      source: new XYZ({
-        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-      }),
-      visible: false
-    });
-
-    layers.current.cities = new TileLayer({
-      source: new TileWMS({
-        url: 'https://ows.mundialis.de/services/service?',
-        params: {
-          LAYERS: 'OSM-WMS',
-          FORMAT: 'image/png',
-          TRANSPARENT: true,
-          TILED: true
-        },
-        serverType: 'geoserver'
-      }),
-      visible: true,
-      opacity: 0
-    });
-
-    layers.current.states = new TileLayer({
-      source: new TileWMS({
-        url: 'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi',
-        params: {
-          LAYERS: 'Reference_Features',
-          FORMAT: 'image/png',
-          TRANSPARENT: true
-        }
-      }),
-      visible: true,
-      opacity: 0
-    });
-
-    // Vector layer for markers
     const vectorLayer = new VectorLayer({
       source: vectorSource.current
     });
 
-    // Initialize map
     mapInstance.current = new Map({
       target: mapRef.current,
       layers: [
@@ -429,12 +429,10 @@ const MapComponent = forwardRef(({ onMapClick, mapClickActive }, ref) => {
       })
     });
 
-    // Set map as ready when view is ready
     mapInstance.current.once('rendercomplete', () => {
       setIsMapReady(true);
     });
 
-    // Initialize popup
     const popup = new Overlay({
       element: popupRef.current,
       positioning: 'bottom-center',
@@ -442,7 +440,6 @@ const MapComponent = forwardRef(({ onMapClick, mapClickActive }, ref) => {
     });
     mapInstance.current.addOverlay(popup);
 
-    // Hover popup
     mapInstance.current.on('pointermove', (evt) => {
       const feature = mapInstance.current.forEachFeatureAtPixel(evt.pixel, f => f);
       if (feature) {
@@ -459,11 +456,9 @@ const MapComponent = forwardRef(({ onMapClick, mapClickActive }, ref) => {
       }
     });
 
-    // Map click event
     mapInstance.current.on('singleclick', async (evt) => {
       const coords = toLonLat(evt.coordinate);
 
-      // Handle coordinate selection for forms
       if (mapClickActive) {
         onMapClick(coords);
         return;
@@ -475,7 +470,7 @@ const MapComponent = forwardRef(({ onMapClick, mapClickActive }, ref) => {
         mapInstance.current.setTarget(null);
       }
     };
-  }, [onMapClick, mapClickActive]);
+  }, [onMapClick, mapClickActive]); 
 
   return (
     <div 
