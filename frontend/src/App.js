@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Container, Navbar, Button, Modal, Form, Row, Col } from 'react-bootstrap';
+import { Container, Navbar, Button, Form, Row, Col, Card } from 'react-bootstrap';
 import MapComponent from './components/MapComponent';
 import ControlPanel from './components/ControlPanel';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -7,64 +7,103 @@ import 'ol/ol.css';
 import './App.css';
 
 function App() {
-  const [showPlaceModal, setShowPlaceModal] = useState(false);
-  const [showDistanceModal, setShowDistanceModal] = useState(false);
-  const [modalMode, setModalMode] = useState('add');
+  const [activePanel, setActivePanel] = useState(null);
   const [distanceResult, setDistanceResult] = useState('');
+  const [mapClickActive, setMapClickActive] = useState(false);
   
   const mapRef = useRef();
 
-  const handleClosePlaceModal = () => {
-    setShowPlaceModal(false);
+  const handleClosePanel = () => {
+    setActivePanel(null);
+    setMapClickActive(false);
+    setDistanceResult("");
   };
 
-  const handleCloseDistanceModal = () => {
-    setShowDistanceModal(false);
-    setDistanceResult(''); // Clear previous result when closing
+  const handleShowPanel = (panelType) => {
+    setActivePanel(panelType);
+    setMapClickActive(false);
   };
 
-  const handleShowPlaceModal = (mode) => {
-    setModalMode(mode);
-    setShowPlaceModal(true);
-  };
-
-  const handleShowDistanceModal = () => {
-    setShowDistanceModal(true);
-    setDistanceResult(''); // Clear previous result when opening
+  const handleMapClick = (coords) => {
+    if (mapClickActive && activePanel) {
+      // Auto-fill coordinates in the form based on active panel
+      if (activePanel === 'add' || activePanel === 'nearest' || activePanel === 'nearby') {
+        const latInput = document.getElementById(`${activePanel}Lat`);
+        const lngInput = document.getElementById(`${activePanel}Lng`);
+        if (latInput && lngInput) {
+          latInput.value = coords[1];
+          lngInput.value = coords[0];
+        }
+      } else if (activePanel === 'distance') {
+        // For distance, fill the first empty field
+        const lat1Input = document.getElementById('distanceLat1');
+        const lng1Input = document.getElementById('distanceLng1');
+        const lat2Input = document.getElementById('distanceLat2');
+        const lng2Input = document.getElementById('distanceLng2');
+        
+        if (!lat1Input.value || !lng1Input.value) {
+          lat1Input.value = coords[1];
+          lng1Input.value = coords[0];
+        } else if (!lat2Input.value || !lng2Input.value) {
+          lat2Input.value = coords[1];
+          lng2Input.value = coords[0];
+        } else {
+          // If both points are filled, replace the second one
+          lat2Input.value = coords[1];
+          lng2Input.value = coords[0];
+        }
+      }
+    }
   };
 
   const handleFormSubmit = async () => {
-    const name = document.getElementById('placeName')?.value;
-    const type = document.getElementById('placeType')?.value;
-    const lat = parseFloat(document.getElementById('placeLat')?.value);
-    const lng = parseFloat(document.getElementById('placeLng')?.value);
-    const radius = parseFloat(document.getElementById('nearbyRadius')?.value) || 5000;
+    if (!activePanel) return;
 
-    if (!lat || !lng) {
-      alert('Please enter both latitude and longitude');
-      return;
-    }
+    let name, type, lat, lng, radius;
 
-    switch (modalMode) {
+    switch (activePanel) {
       case 'add':
-        if (!name) {
-          alert('Name is required');
+        name = document.getElementById('addName')?.value;
+        type = document.getElementById('addType')?.value;
+        lat = parseFloat(document.getElementById('addLat')?.value);
+        lng = parseFloat(document.getElementById('addLng')?.value);
+        
+        if (!name || !lat || !lng) {
+          alert('Please fill all required fields');
           return;
         }
+        
         const success = await mapRef.current?.addPlace(name, type, lat, lng);
         if (success) {
-          handleClosePlaceModal();
+          handleClosePanel();
         }
         break;
       
       case 'nearest':
+        lat = parseFloat(document.getElementById('nearestLat')?.value);
+        lng = parseFloat(document.getElementById('nearestLng')?.value);
+        
+        if (!lat || !lng) {
+          alert('Please enter coordinates');
+          return;
+        }
+        
         await mapRef.current?.findNearest(lat, lng);
-        handleClosePlaceModal();
+        handleClosePanel();
         break;
       
       case 'nearby':
+        lat = parseFloat(document.getElementById('nearbyLat')?.value);
+        lng = parseFloat(document.getElementById('nearbyLng')?.value);
+        radius = parseFloat(document.getElementById('nearbyRadius')?.value) || 5000;
+        
+        if (!lat || !lng) {
+          alert('Please enter coordinates');
+          return;
+        }
+        
         await mapRef.current?.findNearby(lat, lng, radius);
-        handleClosePlaceModal();
+        handleClosePanel();
         break;
       
       default:
@@ -98,6 +137,10 @@ function App() {
     }
   };
 
+  const toggleMapClick = () => {
+    setMapClickActive(!mapClickActive);
+  };
+
   return (
     <div className="App">
       <Navbar bg="success" variant="dark" className="p-2">
@@ -109,140 +152,236 @@ function App() {
       </Navbar>
 
       <ControlPanel 
-        onShowPlaceModal={handleShowPlaceModal}
-        onShowDistanceModal={handleShowDistanceModal}
+        onShowPanel={handleShowPanel}
         mapRef={mapRef}
       />
 
       <MapComponent 
         ref={mapRef}
-        onDistanceCalculate={setDistanceResult}
+        onMapClick={handleMapClick}
+        mapClickActive={mapClickActive}
       />
 
-      {/* Add Place Modal */}
-      <Modal show={showPlaceModal} onHide={handleClosePlaceModal}>
-        <Modal.Header closeButton>
-          <Modal.Title>
-            {modalMode === 'add' ? 'Add Place' : 
-             modalMode === 'nearest' ? 'Find Nearest Place' : 'Find Nearby Places'}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <PlaceForm mode={modalMode} />
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={handleClosePlaceModal}>
-            Close
-          </Button>
-          <Button variant="primary" onClick={handleFormSubmit}>
-            {modalMode === 'add' ? 'Add Place' : 
-             modalMode === 'nearest' ? 'Find Nearest' : 'Find Nearby'}
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* Distance Modal */}
-      <Modal show={showDistanceModal} onHide={handleCloseDistanceModal}>
-        <Modal.Header closeButton>
-          <Modal.Title>Calculate Distance</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <DistanceForm onCalculate={handleDistanceCalculate} />
-          {distanceResult && (
-            <div className="mt-3 p-3 bg-light rounded">
-              <h6>Result:</h6>
-              <p className="mb-0">{distanceResult}</p>
-            </div>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={handleCloseDistanceModal}>
-            Close
-          </Button>
-          <Button variant="primary" onClick={handleDistanceCalculate}>
-            Calculate Distance
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      {/* Floating Action Panel */}
+      {activePanel && (
+        <div className="floating-panel">
+          <Card>
+            <Card.Header className="d-flex justify-content-between align-items-center">
+              <span className="fw-bold">
+                {activePanel === 'add' && 'Add New Place'}
+                {activePanel === 'nearest' && 'Find Nearest Place'}
+                {activePanel === 'nearby' && 'Find Nearby Places'}
+                {activePanel === 'distance' && 'Calculate Distance'}
+              </span>
+              <Button variant="outline-danger" size="sm" onClick={handleClosePanel}>
+                ×
+              </Button>
+            </Card.Header>
+            <Card.Body>
+              {activePanel === 'add' && (
+                <AddPlaceForm 
+                  mapClickActive={mapClickActive}
+                  onToggleMapClick={toggleMapClick}
+                />
+              )}
+              {activePanel === 'nearest' && (
+                <NearestForm 
+                  mapClickActive={mapClickActive}
+                  onToggleMapClick={toggleMapClick}
+                />
+              )}
+              {activePanel === 'nearby' && (
+                <NearbyForm 
+                  mapClickActive={mapClickActive}
+                  onToggleMapClick={toggleMapClick}
+                />
+              )}
+              {activePanel === 'distance' && (
+                <DistanceForm 
+                  mapClickActive={mapClickActive}
+                  onToggleMapClick={toggleMapClick}
+                  distanceResult={distanceResult}
+                />
+              )}
+            </Card.Body>
+            <Card.Footer>
+              {activePanel !== 'distance' ? (
+                <Button variant="primary" onClick={handleFormSubmit} className="w-100">
+                  {activePanel === 'add' ? 'Add Place' : 
+                   activePanel === 'nearest' ? 'Find Nearest' : 'Find Nearby'}
+                </Button>
+              ) : (
+                <Button variant="primary" onClick={handleDistanceCalculate} className="w-100">
+                  Calculate Distance
+                </Button>
+              )}
+            </Card.Footer>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
 
-const PlaceForm = ({ mode }) => {
-  return (
-    <Form>
-      {(mode === 'add') && (
-        <>
-          <Form.Group className="mb-2">
-            <Form.Label>Name</Form.Label>
-            <Form.Control type="text" id="placeName" placeholder="Enter place name" />
-          </Form.Group>
-          <Form.Group className="mb-2">
-            <Form.Label>Type</Form.Label>
-            <Form.Control type="text" id="placeType" placeholder="Enter place type" />
-          </Form.Group>
-        </>
-      )}
-      
-      <Row>
-        <Col>
-          <Form.Group className="mb-2">
-            <Form.Label>Latitude</Form.Label>
-            <Form.Control type="number" id="placeLat" placeholder="Enter latitude" step="any" />
-          </Form.Group>
-        </Col>
-        <Col>
-          <Form.Group className="mb-2">
-            <Form.Label>Longitude</Form.Label>
-            <Form.Control type="number" id="placeLng" placeholder="Enter longitude" step="any" />
-          </Form.Group>
-        </Col>
-      </Row>
-
-      {mode === 'nearby' && (
+// Form Components (same as before)
+const AddPlaceForm = ({ mapClickActive, onToggleMapClick }) => (
+  <Form>
+    <Form.Group className="mb-2">
+      <Form.Label>Name *</Form.Label>
+      <Form.Control type="text" id="addName" placeholder="Enter place name" />
+    </Form.Group>
+    <Form.Group className="mb-2">
+      <Form.Label>Type</Form.Label>
+      <Form.Control type="text" id="addType" placeholder="Enter place type" />
+    </Form.Group>
+    <Row>
+      <Col>
         <Form.Group className="mb-2">
-          <Form.Label>Radius (meters)</Form.Label>
-          <Form.Control 
-            type="number" 
-            id="nearbyRadius" 
-            placeholder="Enter radius" 
-            defaultValue="5000" 
-          />
+          <Form.Label>Latitude *</Form.Label>
+          <Form.Control type="number" id="addLat" placeholder="Latitude" step="any" />
         </Form.Group>
-      )}
-    </Form>
-  );
-};
+      </Col>
+      <Col>
+        <Form.Group className="mb-2">
+          <Form.Label>Longitude *</Form.Label>
+          <Form.Control type="number" id="addLng" placeholder="Longitude" step="any" />
+        </Form.Group>
+      </Col>
+    </Row>
+    <Button 
+      variant={mapClickActive ? "success" : "outline-secondary"}
+      size="sm" 
+      onClick={onToggleMapClick}
+      className="w-100"
+    >
+      {mapClickActive ? '✓ Click on Map to Select' : 'Pick from Map'}
+    </Button>
+    {mapClickActive && (
+      <div className="mt-2">
+        <small className="text-muted">Click anywhere on the map to set coordinates</small>
+      </div>
+    )}
+  </Form>
+);
 
-const DistanceForm = ({ onCalculate }) => {
-  return (
-    <Form>
-      <Row>
-        <Col>
-          <h6>Point 1</h6>
-          <Form.Group className="mb-2">
-            <Form.Label>Latitude</Form.Label>
-            <Form.Control type="number" id="distanceLat1" placeholder="Enter latitude" step="any" />
-          </Form.Group>
-          <Form.Group className="mb-2">
-            <Form.Label>Longitude</Form.Label>
-            <Form.Control type="number" id="distanceLng1" placeholder="Enter longitude" step="any" />
-          </Form.Group>
-        </Col>
-        <Col>
-          <h6>Point 2</h6>
-          <Form.Group className="mb-2">
-            <Form.Label>Latitude</Form.Label>
-            <Form.Control type="number" id="distanceLat2" placeholder="Enter latitude" step="any" />
-          </Form.Group>
-          <Form.Group className="mb-2">
-            <Form.Label>Longitude</Form.Label>
-            <Form.Control type="number" id="distanceLng2" placeholder="Enter longitude" step="any" />
-          </Form.Group>
-        </Col>
-      </Row>
-    </Form>
-  );
-};
+const NearestForm = ({ mapClickActive, onToggleMapClick }) => (
+  <Form>
+    <Row>
+      <Col>
+        <Form.Group className="mb-2">
+          <Form.Label>Latitude</Form.Label>
+          <Form.Control type="number" id="nearestLat" placeholder="Latitude" step="any" />
+        </Form.Group>
+      </Col>
+      <Col>
+        <Form.Group className="mb-2">
+          <Form.Label>Longitude</Form.Label>
+          <Form.Control type="number" id="nearestLng" placeholder="Longitude" step="any" />
+        </Form.Group>
+      </Col>
+    </Row>
+    <Button 
+      variant={mapClickActive ? "success" : "outline-secondary"}
+      size="sm" 
+      onClick={onToggleMapClick}
+      className="w-100"
+    >
+      {mapClickActive ? '✓ Click on Map to Select' : 'Pick from Map'}
+    </Button>
+    {mapClickActive && (
+      <div className="mt-2">
+        <small className="text-muted">Click anywhere on the map to set coordinates</small>
+      </div>
+    )}
+  </Form>
+);
+
+const NearbyForm = ({ mapClickActive, onToggleMapClick }) => (
+  <Form>
+    <Row>
+      <Col>
+        <Form.Group className="mb-2">
+          <Form.Label>Latitude</Form.Label>
+          <Form.Control type="number" id="nearbyLat" placeholder="Latitude" step="any" />
+        </Form.Group>
+      </Col>
+      <Col>
+        <Form.Group className="mb-2">
+          <Form.Label>Longitude</Form.Label>
+          <Form.Control type="number" id="nearbyLng" placeholder="Longitude" step="any" />
+        </Form.Group>
+      </Col>
+    </Row>
+    <Form.Group className="mb-2">
+      <Form.Label>Radius (meters)</Form.Label>
+      <Form.Control 
+        type="number" 
+        id="nearbyRadius" 
+        placeholder="Enter radius" 
+        defaultValue="5000" 
+      />
+    </Form.Group>
+    <Button 
+      variant={mapClickActive ? "success" : "outline-secondary"}
+      size="sm" 
+      onClick={onToggleMapClick}
+      className="w-100"
+    >
+      {mapClickActive ? '✓ Click on Map to Select' : 'Pick from Map'}
+    </Button>
+    {mapClickActive && (
+      <div className="mt-2">
+        <small className="text-muted">Click anywhere on the map to set coordinates</small>
+      </div>
+    )}
+  </Form>
+);
+
+const DistanceForm = ({ mapClickActive, onToggleMapClick, distanceResult }) => (
+  <Form>
+    <Row>
+      <Col>
+        <h6>Point 1</h6>
+        <Form.Group className="mb-2">
+          <Form.Label>Latitude</Form.Label>
+          <Form.Control type="number" id="distanceLat1" placeholder="Latitude" step="any" />
+        </Form.Group>
+        <Form.Group className="mb-2">
+          <Form.Label>Longitude</Form.Label>
+          <Form.Control type="number" id="distanceLng1" placeholder="Longitude" step="any" />
+        </Form.Group>
+      </Col>
+      <Col>
+        <h6>Point 2</h6>
+        <Form.Group className="mb-2">
+          <Form.Label>Latitude</Form.Label>
+          <Form.Control type="number" id="distanceLat2" placeholder="Latitude" step="any" />
+        </Form.Group>
+        <Form.Group className="mb-2">
+          <Form.Label>Longitude</Form.Label>
+          <Form.Control type="number" id="distanceLng2" placeholder="Longitude" step="any" />
+        </Form.Group>
+      </Col>
+    </Row>
+    <Button 
+      variant={mapClickActive ? "success" : "outline-secondary"}
+      size="sm" 
+      onClick={onToggleMapClick}
+      className="w-100 mb-2"
+    >
+      {mapClickActive ? '✓ Click on Map to Select Points' : 'Pick from Map'}
+    </Button>
+    {mapClickActive && (
+      <div className="mt-2 mb-2">
+        <small className="text-muted">Click on the map to set Point 1, then Point 2</small>
+      </div>
+    )}
+    {distanceResult && (
+      <div className="p-2 bg-light rounded">
+        <small className="text-success">{distanceResult}</small>
+      </div>
+    )}
+  </Form>
+);
 
 export default App;

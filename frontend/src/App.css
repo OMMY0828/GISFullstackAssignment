@@ -58,3 +58,44 @@
   color: #666;
   margin-bottom: 1.5rem;
 }
+
+/* Floating Panel */
+.floating-panel {
+  position: absolute;
+  top: 120px;
+  right: 20px;
+  width: 350px;
+  z-index: 1000;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.floating-panel .card {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border: 1px solid #ddd;
+}
+
+/* Map Click Instruction */
+.map-click-instruction-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255, 255, 255, 0.95);
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  z-index: 999;
+  text-align: center;
+  border: 2px solid #007bff;
+}
+
+.instruction-content h6 {
+  color: #007bff;
+  margin-bottom: 10px;
+}
+
+.instruction-content p {
+  color: #666;
+  margin-bottom: 15px;
+}

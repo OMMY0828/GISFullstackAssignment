@@ -1,4 +1,4 @@
-import React, { forwardRef, useImperativeHandle, useEffect, useRef } from 'react';
+import React, { forwardRef, useImperativeHandle, useEffect, useRef, useState } from 'react';
 import { Map, View } from 'ol';
 import TileLayer from 'ol/layer/Tile';
 import VectorLayer from 'ol/layer/Vector';
@@ -13,13 +13,48 @@ import LineString from 'ol/geom/LineString';
 import { Style, Icon, Stroke } from 'ol/style';
 import Overlay from 'ol/Overlay';
 
-const MapComponent = forwardRef(({ onDistanceCalculate }, ref) => {
+const MapComponent = forwardRef(({ onMapClick, mapClickActive }, ref) => {
   const mapRef = useRef();
   const popupRef = useRef();
   const mapInstance = useRef(null);
   const vectorSource = useRef(new VectorSource());
   const layers = useRef({});
   const distanceLineRef = useRef(null);
+  const [isMapReady, setIsMapReady] = useState(false);
+
+  // Update cursor based on map click activity
+  useEffect(() => {
+    if (mapInstance.current && isMapReady) {
+      const viewport = mapInstance.current.getViewport();
+      if (mapClickActive) {
+        viewport.style.cursor = 'crosshair';
+      } else {
+        viewport.style.cursor = '';
+      }
+    }
+  }, [mapClickActive, isMapReady]);
+
+  // Safe zoom function that checks if map is ready
+  const safeZoomToExtent = (extent, options = {}) => {
+    if (mapInstance.current && isMapReady) {
+      mapInstance.current.getView().fit(extent, {
+        padding: [50, 50, 50, 50],
+        maxZoom: 12,
+        duration: 1000,
+        ...options
+      });
+    }
+  };
+
+  const safeAnimateTo = (center, zoom, duration = 1000) => {
+    if (mapInstance.current && isMapReady) {
+      mapInstance.current.getView().animate({
+        center: center,
+        zoom: zoom,
+        duration: duration
+      });
+    }
+  };
 
   useImperativeHandle(ref, () => ({
     showAllLocations: async () => {
@@ -53,11 +88,9 @@ const MapComponent = forwardRef(({ onDistanceCalculate }, ref) => {
         
         // Zoom to show all locations
         if (features.length > 0) {
-          mapInstance.current.getView().fit(vectorSource.current.getExtent(), {
-            padding: [50, 50, 50, 50],
-            maxZoom: 6,
-            duration: 1000
-          });
+          setTimeout(() => {
+            safeZoomToExtent(vectorSource.current.getExtent(), { maxZoom: 6 });
+          }, 100);
         }
       } catch (error) {
         alert(error.message);
@@ -87,11 +120,9 @@ const MapComponent = forwardRef(({ onDistanceCalculate }, ref) => {
         vectorSource.current.addFeature(feature);
 
         // Zoom to the newly added place
-        mapInstance.current.getView().animate({
-          center: fromLonLat([lng, lat]),
-          zoom: 10,
-          duration: 1000
-        });
+        setTimeout(() => {
+          safeAnimateTo(fromLonLat([lng, lat]), 14);
+        }, 100);
         
         return true;
       } catch (error) {
@@ -126,11 +157,9 @@ const MapComponent = forwardRef(({ onDistanceCalculate }, ref) => {
           vectorSource.current.addFeature(feature);
 
           // Zoom to the nearest place
-          mapInstance.current.getView().animate({
-            center: fromLonLat([lon, plat]),
-            zoom: 12,
-            duration: 1000
-          });
+          setTimeout(() => {
+            safeAnimateTo(fromLonLat([lon, plat]), 14);
+          }, 100);
         } else {
           alert('No nearest place found');
         }
@@ -169,19 +198,15 @@ const MapComponent = forwardRef(({ onDistanceCalculate }, ref) => {
           vectorSource.current.addFeatures(features);
 
           // Zoom to show all nearby places
-          mapInstance.current.getView().fit(vectorSource.current.getExtent(), {
-            padding: [50, 50, 50, 50],
-            maxZoom: 12,
-            duration: 1000
-          });
+          setTimeout(() => {
+            safeZoomToExtent(vectorSource.current.getExtent(), { maxZoom: 12 });
+          }, 100);
         } else {
           alert('No nearby places found');
           // Zoom to the search center point
-          mapInstance.current.getView().animate({
-            center: fromLonLat([lng, lat]),
-            zoom: 10,
-            duration: 1000
-          });
+          setTimeout(() => {
+            safeAnimateTo(fromLonLat([lng, lat]), 12);
+          }, 100);
         }
       } catch (error) {
         alert(error.message);
@@ -240,24 +265,23 @@ const MapComponent = forwardRef(({ onDistanceCalculate }, ref) => {
       distanceLineRef.current = line;
 
       // Fit view to show both points with some padding
-      const extent = vectorSource.current.getExtent();
-      mapInstance.current.getView().fit(extent, {
-        padding: [50, 50, 50, 50],
-        maxZoom: 10,
-        duration: 1000
-      });
+      setTimeout(() => {
+        safeZoomToExtent(vectorSource.current.getExtent(), { maxZoom: 10 });
+      }, 100);
     },
 
     setBasemap: (basemap) => {
       const { osm, carto, esri } = layers.current;
-      osm.setVisible(basemap === 'osm');
-      carto.setVisible(basemap === 'carto');
-      esri.setVisible(basemap === 'esri');
+      if (mapInstance.current && isMapReady) {
+        osm.setVisible(basemap === 'osm');
+        carto.setVisible(basemap === 'carto');
+        esri.setVisible(basemap === 'esri');
+      }
     },
 
     setLayerVisibility: (layerName, visible, opacity) => {
       const layer = layers.current[layerName];
-      if (layer) {
+      if (layer && isMapReady) {
         layer.setVisible(visible);
         layer.setOpacity(opacity);
       }
@@ -265,12 +289,17 @@ const MapComponent = forwardRef(({ onDistanceCalculate }, ref) => {
 
     // New method to reset view to default
     resetView: () => {
-      mapInstance.current.getView().animate({
-        center: fromLonLat([78.9629, 20.5937]),
-        zoom: 5,
-        duration: 1000
-      });
-    }
+      if (mapInstance.current && isMapReady) {
+        mapInstance.current.getView().animate({
+          center: fromLonLat([78.9629, 20.5937]),
+          zoom: 5,
+          duration: 1000
+        });
+      }
+    },
+
+    // Method to check if map is ready
+    isMapReady: () => isMapReady
   }));
 
   useEffect(() => {
@@ -344,6 +373,11 @@ const MapComponent = forwardRef(({ onDistanceCalculate }, ref) => {
       })
     });
 
+    // Set map as ready when view is ready
+    mapInstance.current.once('rendercomplete', () => {
+      setIsMapReady(true);
+    });
+
     // Initialize popup
     const popup = new Overlay({
       element: popupRef.current,
@@ -369,12 +403,23 @@ const MapComponent = forwardRef(({ onDistanceCalculate }, ref) => {
       }
     });
 
+    // Map click event
+    mapInstance.current.on('singleclick', async (evt) => {
+      const coords = toLonLat(evt.coordinate);
+
+      // Handle coordinate selection for forms
+      if (mapClickActive) {
+        onMapClick(coords);
+        return;
+      }
+    });
+
     return () => {
       if (mapInstance.current) {
         mapInstance.current.setTarget(null);
       }
     };
-  }, [onDistanceCalculate]);
+  }, [onMapClick, mapClickActive]);
 
   return (
     <div 
@@ -383,6 +428,11 @@ const MapComponent = forwardRef(({ onDistanceCalculate }, ref) => {
       style={{ width: '100%', height: '80vh' }}
     >
       <div ref={popupRef} className="ol-popup"></div>
+      {!isMapReady && (
+        <div className="map-loading-overlay">
+          <div className="loading-spinner">Loading Map...</div>
+        </div>
+      )}
     </div>
   );
 });

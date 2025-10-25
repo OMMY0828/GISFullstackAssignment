@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button, Form, Row, Col } from 'react-bootstrap';
 
-const ControlPanel = ({ onShowPlaceModal, onShowDistanceModal, mapRef }) => {
+const ControlPanel = ({ onShowPanel, mapRef }) => {
   const [activeBasemap, setActiveBasemap] = useState('osm');
   const [activeAction, setActiveAction] = useState(null);
   const [layerStates, setLayerStates] = useState({
@@ -21,16 +21,16 @@ const ControlPanel = ({ onShowPlaceModal, onShowDistanceModal, mapRef }) => {
         mapRef.current?.showAllLocations();
         break;
       case 'add':
-        onShowPlaceModal('add');
+        onShowPanel('add');
         break;
       case 'nearest':
-        onShowPlaceModal('nearest');
+        onShowPanel('nearest');
         break;
       case 'nearby':
-        onShowPlaceModal('nearby');
+        onShowPanel('nearby');
         break;
       case 'distance':
-        onShowDistanceModal();
+        onShowPanel('distance');
         break;
       case 'reset':
         mapRef.current?.resetView();
