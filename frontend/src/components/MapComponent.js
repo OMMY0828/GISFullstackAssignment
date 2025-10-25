@@ -1,0 +1,337 @@
+import React, { forwardRef, useImperativeHandle, useEffect, useRef } from 'react';
+import { Map, View } from 'ol';
+import TileLayer from 'ol/layer/Tile';
+import VectorLayer from 'ol/layer/Vector';
+import VectorSource from 'ol/source/Vector';
+import OSM from 'ol/source/OSM';
+import XYZ from 'ol/source/XYZ';
+import TileWMS from 'ol/source/TileWMS';
+import { fromLonLat, toLonLat } from 'ol/proj';
+import Feature from 'ol/Feature';
+import Point from 'ol/geom/Point';
+import LineString from 'ol/geom/LineString';
+import { Style, Icon, Stroke } from 'ol/style';
+import Overlay from 'ol/Overlay';
+
+const MapComponent = forwardRef(({ onDistanceCalculate }, ref) => {
+  const mapRef = useRef();
+  const popupRef = useRef();
+  const mapInstance = useRef(null);
+  const vectorSource = useRef(new VectorSource());
+  const layers = useRef({});
+  const distanceLineRef = useRef(null);
+
+  useImperativeHandle(ref, () => ({
+    showAllLocations: async () => {
+      vectorSource.current.clear();
+      try {
+        const res = await fetch('http://localhost:4000/api/places/all');
+        if (!res.ok) throw new Error('Failed to fetch places');
+        const places = await res.json();
+        
+        places.forEach(place => {
+          const [lng, lat] = place.location.coordinates;
+          const feature = new Feature({
+            geometry: new Point(fromLonLat([lng, lat]))
+          });
+          feature.setProperties({
+            name: place.name,
+            type: place.type,
+            lat: lat,
+            lng: lng
+          });
+          feature.setStyle(new Style({
+            image: new Icon({
+              src: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+              scale: 0.04
+            })
+          }));
+          vectorSource.current.addFeature(feature);
+        });
+        
+        mapInstance.current.getView().fit(vectorSource.current.getExtent(), {
+          padding: [50, 50, 50, 50],
+          maxZoom: 6
+        });
+      } catch (error) {
+        alert(error.message);
+      }
+    },
+
+    addPlace: async (name, type, lat, lng) => {
+      try {
+        const res = await fetch('http://localhost:4000/api/places', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, type, lat, lng })
+        });
+        
+        if (!res.ok) throw new Error('Failed to add place');
+        
+        const feature = new Feature({
+          geometry: new Point(fromLonLat([lng, lat]))
+        });
+        feature.setProperties({ name, type, lat, lng });
+        feature.setStyle(new Style({
+          image: new Icon({
+            src: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+            scale: 0.04
+          })
+        }));
+        vectorSource.current.addFeature(feature);
+        
+        return true;
+      } catch (error) {
+        alert(error.message);
+        return false;
+      }
+    },
+
+    findNearest: async (lat, lng) => {
+      vectorSource.current.clear();
+      try {
+        const res = await fetch(`http://localhost:4000/api/places/nearest?lat=${lat}&lng=${lng}`);
+        const data = await res.json();
+
+        if (data && data.location) {
+          const [lon, plat] = data.location.coordinates;
+          const feature = new Feature({
+            geometry: new Point(fromLonLat([lon, plat]))
+          });
+          feature.setProperties({
+            name: data.name || "Nearest Place",
+            type: data.type || "Type unknown",
+            lat: plat,
+            lng: lon
+          });
+          feature.setStyle(new Style({
+            image: new Icon({
+              src: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+              scale: 0.04
+            })
+          }));
+          vectorSource.current.addFeature(feature);
+          mapInstance.current.getView().setCenter(fromLonLat([lon, plat]));
+          mapInstance.current.getView().setZoom(8);
+        } else {
+          alert('No nearest place found');
+        }
+      } catch (error) {
+        alert(error.message);
+      }
+    },
+
+    findNearby: async (lat, lng, radius) => {
+      vectorSource.current.clear();
+      try {
+        const res = await fetch(`http://localhost:4000/api/places/nearby?lat=${lat}&lng=${lng}&radius=${radius}`);
+        const data = await res.json();
+
+        if (Array.isArray(data)) {
+          data.forEach(place => {
+            const [lon, plat] = place.location.coordinates;
+            const feature = new Feature({
+              geometry: new Point(fromLonLat([lon, plat]))
+            });
+            feature.setProperties({
+              name: place.name,
+              type: place.type,
+              lat: plat,
+              lng: lon
+            });
+            feature.setStyle(new Style({
+              image: new Icon({
+                src: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+                scale: 0.04
+              })
+            }));
+            vectorSource.current.addFeature(feature);
+          });
+        }
+      } catch (error) {
+        alert(error.message);
+      }
+    },
+
+    plotDistancePoints: (point1, point2) => {
+      // Clear previous distance markers and line
+      vectorSource.current.clear();
+      
+      // Add first point marker
+      const marker1 = new Feature({
+        geometry: new Point(fromLonLat(point1))
+      });
+      marker1.setStyle(new Style({
+        image: new Icon({
+          src: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+          scale: 0.04
+        })
+      }));
+      vectorSource.current.addFeature(marker1);
+
+      // Add second point marker
+      const marker2 = new Feature({
+        geometry: new Point(fromLonLat(point2))
+      });
+      marker2.setStyle(new Style({
+        image: new Icon({
+          src: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+          scale: 0.04
+        })
+      }));
+      vectorSource.current.addFeature(marker2);
+
+      // Create line between points
+      const line = new Feature({
+        geometry: new LineString([fromLonLat(point1), fromLonLat(point2)])
+      });
+      line.setStyle(new Style({
+        stroke: new Stroke({
+          color: '#ff0',
+          width: 3
+        })
+      }));
+      vectorSource.current.addFeature(line);
+      distanceLineRef.current = line;
+
+      // Fit view to show both points
+      const extent = vectorSource.current.getExtent();
+      mapInstance.current.getView().fit(extent, {
+        padding: [50, 50, 50, 50],
+        maxZoom: 10
+      });
+    },
+
+    setBasemap: (basemap) => {
+      const { osm, carto, esri } = layers.current;
+      osm.setVisible(basemap === 'osm');
+      carto.setVisible(basemap === 'carto');
+      esri.setVisible(basemap === 'esri');
+    },
+
+    setLayerVisibility: (layerName, visible, opacity) => {
+      const layer = layers.current[layerName];
+      if (layer) {
+        layer.setVisible(visible);
+        layer.setOpacity(opacity);
+      }
+    }
+  }));
+
+  useEffect(() => {
+    // Initialize layers
+    layers.current.osm = new TileLayer({
+      source: new OSM(),
+      visible: true
+    });
+
+    layers.current.carto = new TileLayer({
+      source: new XYZ({
+        url: 'https://{a-c}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'
+      }),
+      visible: false
+    });
+
+    layers.current.esri = new TileLayer({
+      source: new XYZ({
+        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+      }),
+      visible: false
+    });
+
+    layers.current.cities = new TileLayer({
+      source: new TileWMS({
+        url: 'https://ows.mundialis.de/services/service?',
+        params: {
+          LAYERS: 'OSM-WMS',
+          FORMAT: 'image/png',
+          TRANSPARENT: true,
+          TILED: true
+        },
+        serverType: 'geoserver'
+      }),
+      visible: true,
+      opacity: 0
+    });
+
+    layers.current.states = new TileLayer({
+      source: new TileWMS({
+        url: 'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi',
+        params: {
+          LAYERS: 'Reference_Features',
+          FORMAT: 'image/png',
+          TRANSPARENT: true
+        }
+      }),
+      visible: true,
+      opacity: 0
+    });
+
+    // Vector layer for markers
+    const vectorLayer = new VectorLayer({
+      source: vectorSource.current
+    });
+
+    // Initialize map
+    mapInstance.current = new Map({
+      target: mapRef.current,
+      layers: [
+        layers.current.osm,
+        layers.current.carto,
+        layers.current.esri,
+        layers.current.states,
+        layers.current.cities,
+        vectorLayer
+      ],
+      view: new View({
+        center: fromLonLat([78.9629, 20.5937]),
+        zoom: 5
+      })
+    });
+
+    // Initialize popup
+    const popup = new Overlay({
+      element: popupRef.current,
+      positioning: 'bottom-center',
+      stopEvent: false
+    });
+    mapInstance.current.addOverlay(popup);
+
+    // Hover popup
+    mapInstance.current.on('pointermove', (evt) => {
+      const feature = mapInstance.current.forEachFeatureAtPixel(evt.pixel, f => f);
+      if (feature) {
+        const coord = feature.getGeometry().getCoordinates();
+        const props = feature.getProperties();
+        popup.setPosition(coord);
+        popupRef.current.innerHTML = `
+          <b>${props.name || ''}</b><br>
+          ${props.type || ''}<br>
+          Lat: ${props.lat?.toFixed(5) || ''}, Lng: ${props.lng?.toFixed(5) || ''}
+        `;
+      } else {
+        popup.setPosition(undefined);
+      }
+    });
+
+    return () => {
+      if (mapInstance.current) {
+        mapInstance.current.setTarget(null);
+      }
+    };
+  }, [onDistanceCalculate]);
+
+  return (
+    <div 
+      ref={mapRef} 
+      className="map-container" 
+      style={{ width: '100%', height: '80vh' }}
+    >
+      <div ref={popupRef} className="ol-popup"></div>
+    </div>
+  );
+});
+
+MapComponent.displayName = 'MapComponent';
+
+export default MapComponent;
