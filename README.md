@@ -1,5 +1,5 @@
-# GIS Fullstack (Node + MongoDB + OpenLayers)
+# GIS Fullstack (React + Node + MongoDB + OpenLayers)
 
-This project contains one folders: `backend/`.
+This project contains two folders: `backend/` and `frontend`.
 
 See subfolder README for setup instructions.
