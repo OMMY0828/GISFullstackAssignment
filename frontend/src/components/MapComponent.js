@@ -10,7 +10,7 @@ import { fromLonLat, toLonLat } from 'ol/proj';
 import Feature from 'ol/Feature';
 import Point from 'ol/geom/Point';
 import LineString from 'ol/geom/LineString';
-import { Style, Icon, Stroke } from 'ol/style';
+import { Style, Icon, Stroke, Circle, Fill } from 'ol/style';
 import Overlay from 'ol/Overlay';
 
 const MapComponent = forwardRef(({ onMapClick, mapClickActive }, ref) => {
@@ -55,6 +55,56 @@ const MapComponent = forwardRef(({ onMapClick, mapClickActive }, ref) => {
       });
     }
   };
+
+  // Function to add temporary marker when selecting points from map
+  const addTemporaryMarker = (coords, markerType = 'selection') => {
+    if (!mapInstance.current || !isMapReady) return;
+    
+    const marker = new Feature({
+      geometry: new Point(fromLonLat(coords))
+    });
+    
+    let style;
+    if (markerType === 'selection') {
+      // Red circle for coordinate selection
+      style = new Style({
+        image: new Circle({
+          radius: 8,
+          fill: new Fill({ color: 'red' }),
+          stroke: new Stroke({ color: 'white', width: 2 })
+        })
+      });
+    } else if (markerType === 'point1') {
+      // Blue circle for distance point 1
+      style = new Style({
+        image: new Circle({
+          radius: 8,
+          fill: new Fill({ color: 'blue' }),
+          stroke: new Stroke({ color: 'white', width: 2 })
+        })
+      });
+    } else if (markerType === 'point2') {
+      // Green circle for distance point 2
+      style = new Style({
+        image: new Circle({
+          radius: 8,
+          fill: new Fill({ color: 'green' }),
+          stroke: new Stroke({ color: 'white', width: 2 })
+        })
+      });
+    }
+    
+    marker.setStyle(style);
+    marker.setProperties({
+      name: `Selected Point`,
+      lat: coords[1],
+      lng: coords[0],
+      temporary: true
+    });
+    
+    vectorSource.current.addFeature(marker);
+  };
+
 
   useImperativeHandle(ref, () => ({
     showAllLocations: async () => {
@@ -270,9 +320,15 @@ const MapComponent = forwardRef(({ onMapClick, mapClickActive }, ref) => {
       }, 100);
     },
 
+    // Add temporary marker when selecting coordinates from map
+    addTemporaryMarker: (coords, markerType = 'selection') => {
+      addTemporaryMarker(coords, markerType);
+    },
+
     setBasemap: (basemap) => {
       const { osm, carto, esri } = layers.current;
       if (mapInstance.current && isMapReady) {
+        // Set visibility based on selected basemap
         osm.setVisible(basemap === 'osm');
         carto.setVisible(basemap === 'carto');
         esri.setVisible(basemap === 'esri');

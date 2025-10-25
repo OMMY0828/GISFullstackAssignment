@@ -34,6 +34,7 @@ function App() {
           latInput.value = coords[1];
           lngInput.value = coords[0];
         }
+        mapRef.current?.addTemporaryMarker([coords[0], coords[1]], 'selection');
       } else if (activePanel === 'distance') {
         // For distance, fill the first empty field
         const lat1Input = document.getElementById('distanceLat1');
@@ -44,13 +45,21 @@ function App() {
         if (!lat1Input.value || !lng1Input.value) {
           lat1Input.value = coords[1];
           lng1Input.value = coords[0];
+          // Show blue marker for point 1
+          mapRef.current?.addTemporaryMarker([coords[0], coords[1]], 'point1');
         } else if (!lat2Input.value || !lng2Input.value) {
           lat2Input.value = coords[1];
           lng2Input.value = coords[0];
+          // Show green marker for point 2
+          mapRef.current?.addTemporaryMarker([coords[0], coords[1]], 'point2');
         } else {
           // If both points are filled, replace the second one
           lat2Input.value = coords[1];
           lng2Input.value = coords[0];
+          // Update markers
+          mapRef.current?.clearMap();
+          mapRef.current?.addTemporaryMarker([parseFloat(lng1Input.value), parseFloat(lat1Input.value)], 'point1');
+          mapRef.current?.addTemporaryMarker([coords[0], coords[1]], 'point2');
         }
       }
     }
