@@ -30,8 +30,10 @@ const ControlPanel = ({ onShowPlaceModal, onShowDistanceModal, mapRef }) => {
         onShowPlaceModal('nearby');
         break;
       case 'distance':
-        // Just show the distance modal, no need for activateDistanceMode
         onShowDistanceModal();
+        break;
+      case 'reset':
+        mapRef.current?.resetView();
         break;
     }
   };
@@ -196,6 +198,14 @@ const ControlPanel = ({ onShowPlaceModal, onShowDistanceModal, mapRef }) => {
           onClick={() => handleActionClick('distance')}
         >
           Distance
+        </Button>
+        <Button
+          size="sm"
+          variant="outline-secondary"
+          className="mx-1"
+          onClick={() => handleActionClick('reset')}
+        >
+          Reset View
         </Button>
       </div>
     </div>

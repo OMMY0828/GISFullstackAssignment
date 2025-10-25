@@ -29,7 +29,7 @@ const MapComponent = forwardRef(({ onDistanceCalculate }, ref) => {
         if (!res.ok) throw new Error('Failed to fetch places');
         const places = await res.json();
         
-        places.forEach(place => {
+        const features = places.map(place => {
           const [lng, lat] = place.location.coordinates;
           const feature = new Feature({
             geometry: new Point(fromLonLat([lng, lat]))
@@ -46,13 +46,19 @@ const MapComponent = forwardRef(({ onDistanceCalculate }, ref) => {
               scale: 0.04
             })
           }));
-          vectorSource.current.addFeature(feature);
+          return feature;
         });
+
+        vectorSource.current.addFeatures(features);
         
-        mapInstance.current.getView().fit(vectorSource.current.getExtent(), {
-          padding: [50, 50, 50, 50],
-          maxZoom: 6
-        });
+        // Zoom to show all locations
+        if (features.length > 0) {
+          mapInstance.current.getView().fit(vectorSource.current.getExtent(), {
+            padding: [50, 50, 50, 50],
+            maxZoom: 6,
+            duration: 1000
+          });
+        }
       } catch (error) {
         alert(error.message);
       }
@@ -79,6 +85,13 @@ const MapComponent = forwardRef(({ onDistanceCalculate }, ref) => {
           })
         }));
         vectorSource.current.addFeature(feature);
+
+        // Zoom to the newly added place
+        mapInstance.current.getView().animate({
+          center: fromLonLat([lng, lat]),
+          zoom: 10,
+          duration: 1000
+        });
         
         return true;
       } catch (error) {
@@ -111,8 +124,13 @@ const MapComponent = forwardRef(({ onDistanceCalculate }, ref) => {
             })
           }));
           vectorSource.current.addFeature(feature);
-          mapInstance.current.getView().setCenter(fromLonLat([lon, plat]));
-          mapInstance.current.getView().setZoom(8);
+
+          // Zoom to the nearest place
+          mapInstance.current.getView().animate({
+            center: fromLonLat([lon, plat]),
+            zoom: 12,
+            duration: 1000
+          });
         } else {
           alert('No nearest place found');
         }
@@ -127,8 +145,8 @@ const MapComponent = forwardRef(({ onDistanceCalculate }, ref) => {
         const res = await fetch(`http://localhost:4000/api/places/nearby?lat=${lat}&lng=${lng}&radius=${radius}`);
         const data = await res.json();
 
-        if (Array.isArray(data)) {
-          data.forEach(place => {
+        if (Array.isArray(data) && data.length > 0) {
+          const features = data.map(place => {
             const [lon, plat] = place.location.coordinates;
             const feature = new Feature({
               geometry: new Point(fromLonLat([lon, plat]))
@@ -145,7 +163,24 @@ const MapComponent = forwardRef(({ onDistanceCalculate }, ref) => {
                 scale: 0.04
               })
             }));
-            vectorSource.current.addFeature(feature);
+            return feature;
+          });
+
+          vectorSource.current.addFeatures(features);
+
+          // Zoom to show all nearby places
+          mapInstance.current.getView().fit(vectorSource.current.getExtent(), {
+            padding: [50, 50, 50, 50],
+            maxZoom: 12,
+            duration: 1000
+          });
+        } else {
+          alert('No nearby places found');
+          // Zoom to the search center point
+          mapInstance.current.getView().animate({
+            center: fromLonLat([lng, lat]),
+            zoom: 10,
+            duration: 1000
           });
         }
       } catch (error) {
@@ -161,6 +196,11 @@ const MapComponent = forwardRef(({ onDistanceCalculate }, ref) => {
       const marker1 = new Feature({
         geometry: new Point(fromLonLat(point1))
       });
+      marker1.setProperties({
+        name: 'Start Point',
+        lat: point1[1],
+        lng: point1[0]
+      });
       marker1.setStyle(new Style({
         image: new Icon({
           src: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
@@ -172,6 +212,11 @@ const MapComponent = forwardRef(({ onDistanceCalculate }, ref) => {
       // Add second point marker
       const marker2 = new Feature({
         geometry: new Point(fromLonLat(point2))
+      });
+      marker2.setProperties({
+        name: 'End Point',
+        lat: point2[1],
+        lng: point2[0]
       });
       marker2.setStyle(new Style({
         image: new Icon({
@@ -187,18 +232,19 @@ const MapComponent = forwardRef(({ onDistanceCalculate }, ref) => {
       });
       line.setStyle(new Style({
         stroke: new Stroke({
-          color: '#ff0',
-          width: 3
+          color: 'rgba(0, 132, 255, 1)',
+          width: 4
         })
       }));
       vectorSource.current.addFeature(line);
       distanceLineRef.current = line;
 
-      // Fit view to show both points
+      // Fit view to show both points with some padding
       const extent = vectorSource.current.getExtent();
       mapInstance.current.getView().fit(extent, {
         padding: [50, 50, 50, 50],
-        maxZoom: 10
+        maxZoom: 10,
+        duration: 1000
       });
     },
 
@@ -215,6 +261,15 @@ const MapComponent = forwardRef(({ onDistanceCalculate }, ref) => {
         layer.setVisible(visible);
         layer.setOpacity(opacity);
       }
+    },
+
+    // New method to reset view to default
+    resetView: () => {
+      mapInstance.current.getView().animate({
+        center: fromLonLat([78.9629, 20.5937]),
+        zoom: 5,
+        duration: 1000
+      });
     }
   }));
 
